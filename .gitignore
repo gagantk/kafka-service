@@ -5,3 +5,6 @@
 target/*
 .classpath
 .project
+.mvn/wrapper/*
+mvnw
+mvnw.cmd

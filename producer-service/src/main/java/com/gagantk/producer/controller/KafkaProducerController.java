@@ -8,6 +8,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.gagantk.producer.service.KafkaProducerService;
 
+import io.swagger.v3.oas.annotations.Operation;
+
 @RestController
 @RequestMapping("/kafka")
 public class KafkaProducerController {
@@ -18,6 +20,7 @@ public class KafkaProducerController {
 	@Value(value = "${message.topic.name}")
 	private String topicName;
 
+	@Operation(summary = "Publish random messages to Kafka continuously")
 	@GetMapping(value = "/publish")
 	public String produceMessage() {
 		kafkaProducerService.sendContinuousMessages();

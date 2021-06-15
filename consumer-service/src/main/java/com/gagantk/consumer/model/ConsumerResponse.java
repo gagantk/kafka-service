@@ -7,5 +7,6 @@ public class ConsumerResponse {
 	
 	private int count;
 	private String port;
+	private String host;
 
 }

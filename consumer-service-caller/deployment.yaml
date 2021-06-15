@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: consumer-service-caller
+  name: consumer-service-caller
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consumer-service-caller
+  template:
+    metadata:
+      labels:
+        app: consumer-service-caller
+    spec:
+      containers:
+      - image: gagantk/consumer-service-caller:0.0.1-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+        name: consumer-service-caller
+        env:
+          - name: CONSUMER_SERVICE_URI
+            value: http://consumer-service
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: consumer-service-caller
+  name: consumer-service-caller
+  namespace: default
+spec:
+  ports:
+  - port: 9300
+    protocol: TCP
+    targetPort: 9300
+  selector:
+    app: consumer-service-caller
+  type: LoadBalancer

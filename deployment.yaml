@@ -1,0 +1,237 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: zookeeper-cluster
+  name: zookeeper-cluster
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zookeeper-cluster
+  template:
+    metadata:
+      labels:
+        app: zookeeper-cluster
+        name: zookeeper-cluster
+    spec:
+      containers:
+      - image: wurstmeister/zookeeper
+        imagePullPolicy: IfNotPresent
+        name: zookeeper-cluster
+        ports:
+        - containerPort: 2181
+        - containerPort: 2888
+        - containerPort: 3888
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: zookeeper-cluster
+  name: zookeeper-cluster
+  namespace: default
+spec:
+  type: NodePort
+  ports:
+  - name: zookeeper-cluster
+    port: 2181
+    protocol: TCP
+    targetPort: 2181
+  - name: zookeeper-follower-cluster
+    port: 2888
+    protocol: TCP
+    targetPort: 2888
+  - name: zookeeper-leader-cluster
+    port: 3888
+    protocol: TCP
+    targetPort: 3888
+  selector:
+    app: zookeeper-cluster
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: kafka-cluster
+  name: kafka-cluster
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-cluster
+  template:
+    metadata:
+      labels:
+        app: kafka-cluster
+        name: kafka-cluster
+    spec:
+      hostname: kafka-cluster
+      containers:
+      - image: wurstmeister/kafka
+        imagePullPolicy: IfNotPresent
+        name: kafka-cluster
+        resources:
+        ports:
+        - containerPort: 9092
+        env:
+        - name: KAFKA_ZOOKEEPER_CONNECT
+          value: zookeeper-cluster:2181
+        - name: KAFKA_CREATE_TOPICS
+          value: "mymessagetopic:2:1"
+        - name: KAFKA_LISTENERS
+          value: PLAINTEXT://kafka-cluster:9092
+        - name: KAFKA_ADVERTISED_LISTENERS
+          value: PLAINTEXT://kafka-cluster:9092
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: kafka-cluster
+  name: kafka-cluster
+  namespace: default
+spec:
+  type: NodePort
+  ports:
+  - name: kafka-cluster
+    port: 9092
+    targetPort: 9092
+    protocol: TCP
+  selector:
+    app: kafka-cluster
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: producer-service
+  name: producer-service
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: producer-service
+  template:
+    metadata:
+      labels:
+        app: producer-service
+    spec:
+      containers:
+      - image: gagantk/producer-service:0.0.1-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+        name: producer-service
+        env:
+        - name: KAFKA.SERVER.ADDRESS
+          value: "kafka-cluster:9092"
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: producer-service
+  name: producer-service
+  namespace: default
+spec:
+  ports:
+  - port: 9100
+    protocol: TCP
+    targetPort: 9100
+  selector:
+    app: producer-service
+  type: LoadBalancer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: consumer-service
+  name: consumer-service
+  namespace: default
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: consumer-service
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: consumer-service
+    spec:
+      containers:
+      - image: gagantk/consumer-service:0.0.1-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+        name: consumer-service
+        ports:
+        - containerPort: 9200
+        env:
+        - name: KAFKA.SERVER.ADDRESS
+          value: "kafka-cluster:9092"
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: consumer-service
+  name: consumer-service
+  namespace: default
+spec:
+  ports:
+  - port: 9200
+    protocol: TCP
+    targetPort: 9200
+  selector:
+    app: consumer-service
+  type: LoadBalancer
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: consumer-service-caller
+  name: consumer-service-caller
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: consumer-service-caller
+  template:
+    metadata:
+      labels:
+        app: consumer-service-caller
+    spec:
+      containers:
+      - image: gagantk/consumer-service-caller:0.0.1-SNAPSHOT
+        imagePullPolicy: IfNotPresent
+        name: consumer-service-caller
+        env:
+          - name: CONSUMER_SERVICE_URI
+            value: http://consumer-service
+      restartPolicy: Always
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: consumer-service-caller
+  name: consumer-service-caller
+  namespace: default
+spec:
+  ports:
+  - port: 9300
+    protocol: TCP
+    targetPort: 9300
+  selector:
+    app: consumer-service-caller
+  type: LoadBalancer
